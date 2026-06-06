@@ -1,0 +1,14 @@
+# Tier namespaces. Labels are REQUIRED for NetworkPolicy namespaceSelectors (hardened).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vuln-bank
+  labels:
+    name: vuln-bank
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vuln-bank-db
+  labels:
+    name: vuln-bank-db

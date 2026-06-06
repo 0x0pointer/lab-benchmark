@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# kong-admin-exposed profile = the full hardened control stack PLUS deliberate
+# Phase-6 extension misconfigurations:
+#   * k8s-misconfig component arms EXT-K8S-PRIVESC-SA + EXT-K8S-PRIVILEGED-POD
+#   * the kong-admin NodePort patch arms EXT-KONG-ADMIN-EXPOSED
+# This is the "controls present but operator-misconfigured" variant — it shows
+# whether agent-smith finds the k8s/gateway-layer holes, not just the app vulns.
+resources:
+  - ../hardened
+  - ../../components/k8s-misconfig
+
+# Same digest-pinned lab image as the other profiles (set the digest after build-push.sh).
+images:
+  - name: registry.digitalocean.com/CHANGEME/vuln-bank
+    newName: registry.digitalocean.com/foundry-registry/vuln-bank
+    newTag: seed-v1
+    # digest: sha256:REPLACE_WITH_BUILD_PUSH_OUTPUT
+
+patches:
+  - path: profile-patch.yaml
+  - path: kong-admin-nodeport.yaml

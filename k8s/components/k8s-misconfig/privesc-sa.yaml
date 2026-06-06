@@ -1,0 +1,37 @@
+# ============================================================================
+# INTENTIONAL MISCONFIGURATION — DO NOT USE IN PRODUCTION.
+# Target: EXT-K8S-PRIVESC-SA (over-privileged ServiceAccount token).
+#
+# 'lab-power-sa' lives in the vuln-bank ns and is bound to cluster-admin via a
+# ClusterRoleBinding. A pentester who lands in any pod that mounts this token
+# (or who reads /var/run/secrets/.../token off such a pod) gets full cluster
+# control — the K8s-RBAC privilege-escalation finding.
+#
+# The token-read proof signal (falco serviceaccount_token_read) fires at runtime;
+# this manifest just plants the deliberately broken RBAC grant.
+# ============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: lab-power-sa
+  namespace: vuln-bank
+  labels: { app: lab-misconfig, ext-target: EXT-K8S-PRIVESC-SA }
+  annotations:
+    lab/intentional-misconfig: "EXT-K8S-PRIVESC-SA: over-privileged SA bound to cluster-admin"
+---
+# INTENTIONAL: binds the lab SA to the built-in cluster-admin ClusterRole.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: lab-power-sa-cluster-admin
+  labels: { app: lab-misconfig, ext-target: EXT-K8S-PRIVESC-SA }
+  annotations:
+    lab/intentional-misconfig: "EXT-K8S-PRIVESC-SA: cluster-admin granted to a namespaced SA"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: lab-power-sa
+    namespace: vuln-bank

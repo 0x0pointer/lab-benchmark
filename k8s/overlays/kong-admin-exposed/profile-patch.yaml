@@ -1,0 +1,28 @@
+# Tag observer + canary events with profile=kong-admin-exposed (attribution in the oracle).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vuln-bank
+  namespace: vuln-bank
+spec:
+  template:
+    spec:
+      containers:
+        - name: vuln-bank
+          env:
+            - name: LAB_PROFILE
+              value: kong-admin-exposed
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canary-http
+  namespace: vuln-bank
+spec:
+  template:
+    spec:
+      containers:
+        - name: canary-http
+          env:
+            - name: LAB_PROFILE
+              value: kong-admin-exposed

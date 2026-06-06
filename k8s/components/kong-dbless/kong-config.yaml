@@ -1,0 +1,76 @@
+# Kong DB-less declarative config (the blog's kong.yaml + oracle logging).
+# In DB-less mode this single file defines every route, plugin, and service — it is
+# version-controlled and auditable, exactly as the blog intends. (PLAN.md §2 hardened)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-config
+  namespace: kong
+data:
+  kong.yaml: |
+    _format_version: "3.0"
+
+    services:
+      - name: vuln-bank-service
+        url: http://vuln-bank-svc.vuln-bank.svc.cluster.local:5000
+        connect_timeout: 10000
+        read_timeout: 30000
+        write_timeout: 30000
+
+        routes:
+          # Catch-all -> the app. Lower specificity than the routes below, so Kong
+          # matches the blocked/rate-limited routes first.
+          - name: allow-all-route
+            paths: ["/"]
+            strip_path: false
+            plugins:
+              - name: request-size-limiting
+                config:
+                  allowed_payload_size: 1      # MEGABYTES (not bytes). Mitigates large uploads; small PoCs still pass.
+
+          # Auth + password-reset surface -> rate limited (compensates brute-force vulns).
+          - name: api-public-route
+            paths: ["/login", "/register", "/api/v1/forgot-password", "/api/v2/forgot-password",
+                    "/api/v3/forgot-password", "/api/v1/reset-password", "/api/v2/reset-password",
+                    "/api/v3/reset-password"]
+            strip_path: false
+            plugins:
+              - name: rate-limiting
+                config:
+                  minute: 20
+                  policy: local
+
+          # Internal / docs / admin-doc surface -> hard 404 at the gateway (app never sees it).
+          # NOTE: the app's REAL admin is /admin/* and /sup3r_s3cr3t_admin (NOT /api/admin),
+          # and /debug/users is NOT blocked — both remain reachable (encoded in ground_truth.yaml).
+          - name: blocked-internal-route
+            paths: ["/internal", "/api/admin", "/api/docs", "/static/openapi.json"]
+            strip_path: false
+            plugins:
+              - name: request-termination
+                config:
+                  status_code: 404
+                  message: "Not found"
+
+    plugins:
+      # Inject security headers + strip server fingerprinting (makes VB-MISSING-HEADERS
+      # N/A-blocked on hardened — a clean control-efficacy signal).
+      - name: response-transformer
+        config:
+          add:
+            headers:
+              - "X-Content-Type-Options:nosniff"
+              - "X-Frame-Options:DENY"
+              - "Referrer-Policy:no-referrer"
+              - "Content-Security-Policy:default-src 'self'"
+              - "X-Kong-Upstream:vuln-bank"
+          remove:
+            headers:
+              - "Server"
+              - "X-Powered-By"
+              - "X-Kong-Version"
+              - "Via"
+      # Request log -> stdout (oracle kong_log signal: 404 = probed-a-blocked-route, 429 = brute mitigated).
+      - name: file-log
+        config:
+          path: /dev/stdout

@@ -1,0 +1,37 @@
+# scoring run artifacts
+runs/
+out/
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# terraform (Phase 2+)
+.terraform/
+*.tfstate
+*.tfstate.*
+# tfvars may contain the DO token / CIDRs — never commit (note: .gitignore has NO inline comments)
+*.tfvars
+!*.tfvars.example
+crash.log
+
+# secrets
+*.pem
+*.key
+kubeconfig*
+.env
+.env.*
+!.env.example
+
+# os
+.DS_Store
+
+# LLM-judge verdict cache (regenerated on demand)
+oracle/scorer/.judge_cache.json
+
+# ephemeral per-run proof events
+events.jsonl
+*.events.jsonl

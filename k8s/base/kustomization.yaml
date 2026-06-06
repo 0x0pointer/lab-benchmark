@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Base = identical vulnerable stack shared by ALL profiles. Profiles (raw/hardened)
+# are overlays that differ only in exposure + controls, never in the vulnerable code.
+resources:
+  - namespaces/namespaces.yaml
+  - postgres/postgres.yaml
+  - vuln-bank/app.yaml
+  - canary-http/canary.yaml
+
+labels:
+  - pairs:
+      lab: vulnbank-benchmark
+    includeSelectors: false

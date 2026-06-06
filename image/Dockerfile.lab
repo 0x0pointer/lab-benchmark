@@ -1,0 +1,16 @@
+# Lab image = upstream VulnBank (built pristine) + the read-only observer middleware.
+# build-push.sh builds the upstream image first and passes it as BASE_IMAGE so the
+# vulnerable code is never modified — we only layer the observer + entrypoint on top.
+ARG BASE_IMAGE=vuln-bank-base:local
+FROM ${BASE_IMAGE}
+
+# Bake the observer (read-only proof events) + the observer-wrapped entrypoint.
+COPY middleware/observer.py /app/observer.py
+COPY lab_entrypoint.py /app/lab_entrypoint.py
+COPY lab_start.sh /app/lab_start.sh
+RUN chmod +x /app/lab_start.sh
+
+# Faster pod readiness than the upstream 30s liveness probe (see PLAN.md §7.3).
+ENV PYTHONUNBUFFERED=1 LAB_OBSERVER=1
+
+CMD ["./lab_start.sh"]

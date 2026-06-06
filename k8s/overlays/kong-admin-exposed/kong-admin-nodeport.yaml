@@ -1,0 +1,22 @@
+# ============================================================================
+# INTENTIONAL MISCONFIGURATION — DO NOT USE IN PRODUCTION.
+# Target: EXT-KONG-ADMIN-EXPOSED (Kong admin API reachable externally).
+#
+# Patches the hardened kong-gateway-admin Service from ClusterIP to NodePort so
+# the Kong Admin API (:8001) is reachable from outside the cluster — full gateway
+# takeover (add/remove routes, strip rate limits, dump config). 30081 is taken by
+# the raw app NodePort, so this uses 30001.
+#
+# Proof signal (kong_log admin_api_external_access) fires at runtime.
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-gateway-admin
+  namespace: kong
+  annotations:
+    lab/intentional-misconfig: "EXT-KONG-ADMIN-EXPOSED: admin API on a NodePort"
+spec:
+  type: NodePort
+  ports:
+    - { name: admin, port: 8001, targetPort: 8001, nodePort: 30001 }

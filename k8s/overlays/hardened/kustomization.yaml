@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# hardened profile = identical base app + the blog's control stack:
+#   Kong DB-less (route blocks + rate limits + header injection + request log),
+#   cert-manager self-signed TLS, and tier NetworkPolicies.
+# No direct NodePort to the app — traffic enters only via Kong (30080/30443).
+resources:
+  - ../../base
+  - ../../components/kong-dbless
+  - ../../components/cert-manager
+  - ../../components/networkpolicies
+
+# Same digest-pinned lab image as raw (set the digest after build-push.sh).
+images:
+  - name: registry.digitalocean.com/CHANGEME/vuln-bank
+    newName: registry.digitalocean.com/foundry-registry/vuln-bank
+    newTag: seed-v1
+    # digest: sha256:REPLACE_WITH_BUILD_PUSH_OUTPUT
+
+patches:
+  - path: profile-patch.yaml

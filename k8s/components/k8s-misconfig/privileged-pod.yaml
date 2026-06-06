@@ -1,0 +1,46 @@
+# ============================================================================
+# INTENTIONAL MISCONFIGURATION — DO NOT USE IN PRODUCTION.
+# Target: EXT-K8S-PRIVILEGED-POD (privileged + host-mount -> container escape).
+#
+# 'lab-privileged' runs a harmless busybox sleep, but with:
+#   * securityContext.privileged: true   (all capabilities, device access)
+#   * hostPID: true                      (sees the host process tree)
+#   * a read-only hostPath mount of the node's "/"  (host filesystem visible)
+# Together these give a trivial container-escape / host-filesystem-read primitive
+# — the K8s pod-security finding. The image does nothing on its own; the danger is
+# purely the securityContext + host mount.
+#
+# Mounted to lab-power-sa so a single compromise chains pod-escape + cluster-admin
+# (EXT-K8S-PRIVILEGED-POD -> EXT-K8S-PRIVESC-SA).
+#
+# Proof signal (falco container_escape_or_host_mount) fires at runtime.
+# ============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lab-privileged
+  namespace: vuln-bank
+  labels: { app: lab-misconfig, ext-target: EXT-K8S-PRIVILEGED-POD }
+  annotations:
+    lab/intentional-misconfig: "EXT-K8S-PRIVILEGED-POD: privileged + hostPID + hostPath / mount"
+spec:
+  serviceAccountName: lab-power-sa        # chains to the over-privileged token
+  hostPID: true                           # INTENTIONAL: host process namespace
+  containers:
+    - name: lab-privileged
+      image: busybox:1.36
+      command: ["/bin/sh", "-c", "sleep infinity"]
+      securityContext:
+        privileged: true                  # INTENTIONAL: full privilege escalation
+      volumeMounts:
+        - name: host-root
+          mountPath: /host
+          readOnly: true                  # read-only, still a host-fs disclosure primitive
+      resources:
+        limits: { memory: 64Mi, cpu: 100m }
+        requests: { memory: 16Mi, cpu: 10m }
+  volumes:
+    - name: host-root
+      hostPath:                           # INTENTIONAL: mounts the node's root filesystem
+        path: /
+        type: Directory

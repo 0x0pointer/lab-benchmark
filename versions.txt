@@ -1,0 +1,22 @@
+# Pinned versions — bump deliberately; a change here is a baseline re-bless event.
+# (see PLAN.md §6.4, §7.4)
+
+ground_truth.schema_version = 1
+
+# VulnBank app (pin the commit when the Phase-1 image is built)
+vulnbank.repo   = https://github.com/Commando-X/vuln-bank
+vulnbank.commit = TBD
+vulnbank.image  = TBD@sha256:TBD          # digest-pinned DOCR tag (Phase 1)
+
+# agent-smith — the tool under test (vendor as pinned submodule for the normalizer contract test)
+agent_smith.commit = TBD
+
+# Tier-2 LLM judge matcher (Phase 4) — pin the dated model snapshot
+llm_judge.model = TBD                      # e.g. claude-opus-4-x dated snapshot
+
+# Baseline scorecard this repo regresses against (Phase 5)
+baseline.id = none-yet
+# Calibration reference (Phase 0): the frozen 37-finding agent-smith run
+calibration.fixture = oracle/scorer/fixtures/findings_sample.json
+calibration.report_recall_raw = 0.49      # 24/49 distinct vulns reported
+registry.digitalocean.com/foundry-registry/vuln-bank@sha256:19f12f707f7fd3801af83fba884a45885ca46b4e1b12ad96f4bb248a51e8b96d

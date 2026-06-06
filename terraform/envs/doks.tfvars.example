@@ -1,0 +1,17 @@
+# Copy to doks.tfvars (gitignored). NON-SECRET config only — the DO token lives in
+# the repo-root .env as DO_TOKEN (the Makefile exports it as TF_VAR_do_token).
+# Apply with:  make up
+
+region     = "ams3"
+cluster_name = "vulnbank-lab"
+docr_name  = "smithbench"          # globally unique; registry.digitalocean.com/smithbench/vuln-bank
+
+# Your egress IP(s). Find yours: curl -s https://ifconfig.me  -> add as /32.
+# Add the CI/runner egress IP too. NEVER 0.0.0.0/0 (terraform will refuse).
+allowed_source_cidrs = ["203.0.113.10/32"]
+
+# Optional overrides:
+# node_size        = "s-2vcpu-4gb"
+# node_count       = 2
+# ha_control_plane = false
+# docr_tier        = "basic"

@@ -1,0 +1,81 @@
+# VulnBank application tier (vuln-bank ns), running the LAB image (app + observer).
+# The image is set per-overlay via kustomize images[] (digest-pinned from build-push.sh).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vuln-bank-db-secret
+  namespace: vuln-bank
+type: Opaque
+stringData:
+  username: postgres
+  password: LabPass2024!
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vuln-bank
+  namespace: vuln-bank
+  labels: { app: vuln-bank, tier: application }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: vuln-bank }
+  template:
+    metadata:
+      labels: { app: vuln-bank, tier: application }
+    spec:
+      containers:
+        - name: vuln-bank
+          # OVERRIDDEN per overlay (images[]). Placeholder so kustomize build validates.
+          image: registry.digitalocean.com/CHANGEME/vuln-bank:seed-v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+          env:
+            - name: DB_HOST
+              value: postgres-svc.vuln-bank-db.svc.cluster.local
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: vulnerable_bank
+            - name: DB_USER
+              valueFrom: { secretKeyRef: { name: vuln-bank-db-secret, key: username } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: vuln-bank-db-secret, key: password } }
+            # Observer attribution (PLAN.md §7). LAB_PROFILE is patched per overlay.
+            - name: LAB_PROFILE
+              value: raw
+            - name: LAB_RUN_ID
+              value: dev
+            # Empty/demo key -> AI agent runs in MOCK mode (no external egress) but the
+            # prompt-injection / system-prompt-leak / excessive-agency vulns still fire.
+            - name: DEEPSEEK_API_KEY
+              value: ""
+          # Fast readiness via /healthz + startupProbe (PLAN.md §7.3 — beats the blog's 30s liveness).
+          startupProbe:
+            httpGet: { path: /healthz, port: 5000 }
+            initialDelaySeconds: 3
+            periodSeconds: 3
+            failureThreshold: 20
+          readinessProbe:
+            httpGet: { path: /healthz, port: 5000 }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: 5000 }
+            periodSeconds: 15
+          resources:
+            limits: { memory: 512Mi, cpu: 500m }
+            requests: { memory: 128Mi, cpu: 100m }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vuln-bank-svc
+  namespace: vuln-bank
+spec:
+  selector: { app: vuln-bank }
+  ports:
+    - name: http
+      port: 5000
+      targetPort: 5000
+  type: ClusterIP        # raw overlay adds a NodePort; hardened routes via Kong

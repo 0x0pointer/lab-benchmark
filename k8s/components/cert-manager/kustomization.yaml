@@ -1,0 +1,6 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Only the issuers + certs. cert-manager itself is installed out-of-band
+# (make cert-manager-install) because its CRDs must exist before these apply.
+resources:
+  - issuer.yaml

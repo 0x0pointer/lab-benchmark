@@ -1,0 +1,4 @@
+# Phase 0 oracle/scorer
+PyYAML>=6.0
+# Phase 4 (Tier-2 LLM judge matcher) — not imported yet:
+# anthropic>=0.40

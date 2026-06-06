@@ -1,0 +1,60 @@
+name: nightly-regression
+
+# Detect agent-smith detection regressions against the VulnBank lab.
+# The PURE oracle tests run anywhere. The live benchmark needs a persistent,
+# firewall-locked cluster + an agent-smith runner (see the gated job below).
+
+on:
+  schedule:
+    - cron: "0 3 * * *"      # 03:00 UTC nightly
+  workflow_dispatch: {}
+
+jobs:
+  oracle-selftest:
+    # Always runs — proves the scorer itself is sound (deterministic, calibrated).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements.txt
+      - name: Validate ground truth
+        run: make validate
+      - name: Oracle test suite (canonicalizer · idempotency · signals · fuse · regression)
+        run: make test
+      - name: Report-parse calibration on the frozen sample
+        run: make score-fixture || true   # informational; gate is the live job
+
+  live-regression:
+    # Gated: only runs if a kubeconfig secret is present (persistent cluster, NOT
+    # ephemeral-per-run — DOKS provisioning is too slow/flaky for the hot path, PLAN.md §8.4).
+    needs: oracle-selftest
+    if: ${{ secrets.LAB_KUBECONFIG != '' }}
+    runs-on: ubuntu-latest        # use a self-hosted runner inside the lab VPC for intra-DO scanning
+    env:
+      N_RUNS: "3"
+      AGENT_SMITH: ${{ github.workspace }}/agent-smith
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements.txt
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube && echo "${{ secrets.LAB_KUBECONFIG }}" > ~/.kube/config
+          kubectl get nodes
+      # TODO: check out / install agent-smith and set AGENT_CMD to a headless invocation,
+      #       e.g. capped: session(start, depth=thorough, max_time_minutes=30, max_cost_usd=...).
+      - name: Reseed + N scored runs (raw profile)
+        run: |
+          for i in $(seq 1 "$N_RUNS"); do
+            NO_RESEED= MODE=portforward PROFILE=raw ./scripts/run-benchmark.sh raw || true
+          done
+      - name: Aggregate + regress vs baseline
+        run: |
+          make aggregate PROFILE=raw AGG=out/aggregate.json
+          make regress AGG=out/aggregate.json BASELINE=oracle/scorer/baselines/current.json
+      - name: Upload run artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: scorecards, path: "runs/**/scorecard.json" }

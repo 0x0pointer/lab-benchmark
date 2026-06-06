@@ -1,0 +1,75 @@
+# Tier NetworkPolicies (hardened profile). REQUIRES an enforcing CNI (DOKS Cilium).
+# On a non-enforcing CNI these are silently ignored and hardened == raw — verify
+# enforcement before trusting the FN/N-A accounting (PLAN.md risk #5 / Phase-2 accept).
+#
+# Effect on the vuln set:
+#   * external SSRF + cross-namespace SSRF -> blocked (egress denied) => VB-SSRF-CLOUD-METADATA blocked
+#   * DeepSeek external call -> blocked => VB-AI-SENSITIVE-DATA-EXT mitigated
+#   * loopback SSRF to the app's OWN /internal still works (same pod) — that's the vuln, not a control
+#   * canary-http egress is explicitly ALLOWED so the SSRF proof signal still fires
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vuln-bank-netpol
+  namespace: vuln-bank
+spec:
+  podSelector:
+    matchLabels: { app: vuln-bank }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # only Kong may reach the app (no direct NodePort on hardened)
+    - from:
+        - namespaceSelector:
+            matchLabels: { name: kong }
+      ports:
+        - { port: 5000 }
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }
+    # Postgres (cross-namespace, app tier -> db tier)
+    - to:
+        - namespaceSelector:
+            matchLabels: { name: vuln-bank-db }
+          podSelector:
+            matchLabels: { app: postgres }
+      ports:
+        - { port: 5432 }
+    # canary-http (same ns) — keep the SSRF proof signal reachable
+    - to:
+        - podSelector:
+            matchLabels: { app: canary-http }
+      ports:
+        - { port: 8080 }
+    # oracle namespace (oob-listener / oracle-postgres) — Phase 4; harmless if absent
+    - to:
+        - namespaceSelector:
+            matchLabels: { name: oracle }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-netpol
+  namespace: vuln-bank-db
+spec:
+  podSelector:
+    matchLabels: { app: postgres }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # only the app tier may reach Postgres
+    - from:
+        - namespaceSelector:
+            matchLabels: { name: vuln-bank }
+          podSelector:
+            matchLabels: { app: vuln-bank }
+      ports:
+        - { port: 5432 }
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }

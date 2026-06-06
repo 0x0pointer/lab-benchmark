@@ -1,0 +1,24 @@
+# ============================================================================
+# k8s-misconfig component (Phase 6 lab extensions).
+# These manifests are INTENTIONAL KUBERNETES MISCONFIGURATIONS that turn on the
+# EXT-K8S-* detection targets. Reference this directory from a profile overlay's
+# resources: to arm them; never apply to anything but the isolated benchmark
+# cluster. (kind: Kustomization to match the other k8s/components/* dirs, which
+# are consumed as plain bases by the hardened overlay.)
+#
+# Targets armed here:
+#   EXT-K8S-PRIVESC-SA      -> privesc-sa.yaml      (cluster-admin SA in vuln-bank)
+#   EXT-K8S-PRIVILEGED-POD  -> privileged-pod.yaml  (privileged + hostPath / mount)
+#
+# NOT armed by a manifest (node-level setting, documented as a target):
+#   EXT-K8S-KUBELET-RO  -> the read-only kubelet API on :10255 is a KUBELET CONFIG
+#   flag (--read-only-port=10255 / readOnlyPort in the kubelet config), not a
+#   Kubernetes object. It cannot be expressed as a manifest and is therefore left
+#   as a node-config-dependent target: enable it on the node's kubelet config in
+#   the benchmark cluster to make EXT-K8S-KUBELET-RO reachable at runtime.
+# ============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - privesc-sa.yaml
+  - privileged-pod.yaml

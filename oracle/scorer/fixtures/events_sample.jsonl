@@ -1,0 +1,8 @@
+LAB_EVENT {"type":"CANARY_HIT","src":"10.244.0.9","path":"/ssrf-token-abc","ua":"python-requests"}
+LAB_EVENT {"type":"DB_NEG_TRANSFER_ROW","amount":-50000,"src":"10.244.0.9"}
+LAB_EVENT {"type":"ACCOUNT_ACCESS","path":"/check_balance/999000111","authenticated":false,"target":"999000111","src":"10.244.0.9"}
+LAB_EVENT {"type":"AI_CANARY_ECHO","path":"/api/ai/chat","src":"10.244.0.9"}
+LAB_EVENT {"type":"MASS_ASSIGN","path":"/register","injected_fields":["is_admin"],"src":"10.244.0.9"}
+LAB_EVENT {"type":"DEBUG_USERS_ACCESS","path":"/debug/users","src":"10.244.0.9"}
+LAB_EVENT {"type":"SQLI_SIGNAL","path":"/login","param":"username","snippet":"admin' or '1'='1","src":"10.244.0.9"}
+LAB_EVENT {"type":"DB_SQLI_EXEC","path":"/login","src":"10.244.0.9"}

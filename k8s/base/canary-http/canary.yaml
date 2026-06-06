@@ -1,0 +1,76 @@
+# canary-http — the in-cluster SSRF proof target (vuln-bank ns).
+# Serves a per-run token and LOGS every request (src IP, method, path, UA) as
+# CANARY_HIT json lines. A successful SSRF from VulnBank to http://canary.vuln-bank
+# .svc.cluster.local:8080/<token> is the cleanest in-band proof the fetch fired
+# (the SSRF is blind — body is not echoed — so the access log is the signal). PLAN.md §6.1.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: canary-http-src
+  namespace: vuln-bank
+data:
+  server.py: |
+    import http.server, json, os, time
+    TOKEN = os.getenv("CANARY_TOKEN", "CANARY_DEV")
+    class H(http.server.BaseHTTPRequestHandler):
+        def _log(self):
+            rec = {"type":"CANARY_HIT","ts":round(time.time(),3),
+                   "src":self.client_address[0],"method":self.command,"path":self.path,
+                   "ua":self.headers.get("User-Agent",""),
+                   "run_id":os.getenv("LAB_RUN_ID","dev"),"profile":os.getenv("LAB_PROFILE","raw")}
+            print("LAB_EVENT "+json.dumps(rec,separators=(",",":")),flush=True)
+        def do_GET(self):
+            self._log()
+            self.send_response(200); self.end_headers()
+            self.wfile.write(("canary-ok "+TOKEN+"\n").encode())
+        do_POST = do_GET
+        def log_message(self,*a): pass
+    http.server.HTTPServer(("0.0.0.0",8080),H).serve_forever()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canary-http
+  namespace: vuln-bank
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: canary-http }
+  template:
+    metadata:
+      labels: { app: canary-http }
+    spec:
+      containers:
+        - name: canary-http
+          image: python:3.12-alpine
+          command: ["python", "/app/server.py"]
+          env:
+            - name: CANARY_TOKEN
+              value: dev                 # rotated per-run by reseed-hard/refresh (kubectl set env)
+            - name: LAB_RUN_ID
+              value: dev                 # matches the app default so NO_RESEED runs stay self-consistent
+            - name: LAB_PROFILE
+              value: raw
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: src
+              mountPath: /app
+          resources:
+            limits: { memory: 64Mi, cpu: 100m }
+            requests: { memory: 32Mi, cpu: 50m }
+      volumes:
+        - name: src
+          configMap: { name: canary-http-src }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: canary
+  namespace: vuln-bank
+spec:
+  selector: { app: canary-http }
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP
