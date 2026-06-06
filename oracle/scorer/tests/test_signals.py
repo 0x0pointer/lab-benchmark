@@ -60,6 +60,12 @@ class TestCollect(unittest.TestCase):
         self.assertIn("VB-SSRF-PROFILE-URL", sig)
         self.assertNotIn("VB-DEBUG-USERS", sig)
 
+    def test_distinct_run_ids(self):
+        from oracle.scorer.signals import distinct_run_ids
+        evs = [{"run_id": "b"}, {"run_id": "a"}, {"run_id": "a"}, {"type": "x"}]  # one untagged
+        self.assertEqual(distinct_run_ids(evs), ["a", "b"])
+        self.assertEqual(distinct_run_ids([{"type": "x"}]), [])
+
     def test_load_events_jsonl_prefix(self):
         evs = load_events(_EVENTS)
         types = {e["type"] for e in evs}

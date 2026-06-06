@@ -156,6 +156,11 @@ def load_events(path: str) -> list[dict]:
     return events
 
 
+def distinct_run_ids(events: list[dict]) -> list[str]:
+    """Sorted distinct non-empty run_ids present in an event stream (for stale/mix detection)."""
+    return sorted({e.get("run_id") for e in events if e.get("run_id")})
+
+
 def collect_signals(events: list[dict], run_id: str | None = None) -> dict[str, dict]:
     """Reduce events to {gt_id: {strength, count, event_types, evidence[]}}, best strength wins.
 

@@ -158,7 +158,7 @@ collect-events:
 
 score-events:
 	$(PYTHON) -m oracle.scorer.cli score --findings $(FINDINGS) \
-		--events $${EVENTS:-events.jsonl} --profile $(PROFILE)
+		--events $${EVENTS:-events.jsonl} $${RUN_ID:+--run-id $$RUN_ID} --profile $(PROFILE)
 
 seed-check:
 	@./scripts/seed-check.sh $${URL:?set URL=http://<host>:<port>}

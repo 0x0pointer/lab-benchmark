@@ -19,7 +19,7 @@ from .parse_artifacts import load_findings
 from .regression import aggregate_scorecards, compare, make_baseline, quality_floor_warnings
 from .registry import load_registry
 from .score import build_scorecard, build_scorecard_v2, render_text, render_v2
-from .signals import collect_signals, load_events
+from .signals import collect_signals, distinct_run_ids, load_events
 
 
 def _load_json(path):
@@ -45,7 +45,24 @@ def _cmd_score(args) -> int:
     matches = match_all(findings, reg)
 
     if args.events:
-        signals = collect_signals(load_events(args.events), run_id=args.run_id)
+        events = load_events(args.events)
+        present = distinct_run_ids(events)
+        # Guard against the #1 footgun: scoring a STALE or MIXED proof stream (events from a
+        # different run / before a reseed) against this findings.json.
+        if args.run_id:
+            if present and args.run_id not in present:
+                print(f"[score] WARNING: no proof events tagged run_id={args.run_id} "
+                      f"(events.jsonl contains: {', '.join(present)}). Run "
+                      f"`RUN_ID={args.run_id} make collect-events` AFTER the agent attacked THIS "
+                      f"lab state — exploit-recall will read ~0 otherwise.", file=sys.stderr)
+        elif len(present) > 1:
+            print(f"[score] WARNING: events.jsonl mixes {len(present)} runs ({', '.join(present)}); "
+                  f"scoring ALL of them. Pass RUN_ID=<id> to isolate one run.", file=sys.stderr)
+        elif len(present) == 1:
+            print(f"[score] note: scoring proof events from run {present[0]} "
+                  f"(pass RUN_ID={present[0]} to pin it; verify it matches this findings.json).",
+                  file=sys.stderr)
+        signals = collect_signals(events, run_id=args.run_id)
         scorecard = build_scorecard_v2(reg, matches, signals, profile=args.profile)
         print(render_v2(scorecard, reg))
     else:

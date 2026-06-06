@@ -29,16 +29,19 @@ make image                         # build + upload the app image (once)
 ### Each time you want to run a test
 
 ```bash
-make wake                          # 1. turn the lab ON  (creates the cloud server, ~10 min)
-make reseed-hard PROFILE=raw       # 2. reset to a clean, known state
-make urls                          # 3. prints the lab URL, e.g. http://NODE_IP:30081
+make wake                            # 1. turn the lab ON  (creates the cloud server, ~10 min)
+RUN=$(make reseed-hard PROFILE=raw)  # 2. reset to a clean state (capture this run's id)
+make urls                            # 3. prints the lab URL, e.g. http://NODE_IP:30081
 
-#    4. point agent-smith at that URL and let it run
+#    4. point agent-smith at that URL and let it FINISH attacking
 
-make collect-events                # 5. gather the proof of what was actually exploited
-make score-events FINDINGS=../agent-smith/findings.json PROFILE=raw
-#       ^ prints the scorecard: how many vulns were found AND proved, and what was missed
+RUN_ID=$RUN make collect-events      # 5. gather THIS run's proof of what was exploited
+make score-events FINDINGS=../agent-smith/findings.json RUN_ID=$RUN PROFILE=raw
+#       ^ scorecard: how many vulns were found AND proved, and what was missed
 ```
+> ⚠️ Keep `RUN=$RUN` consistent across steps 2/5/scoring. Collect events **after** agent-smith
+> finishes (step 4), on the same un-reseeded lab — otherwise you're scoring stale proof and the
+> scorer will warn you (`no proof events tagged run_id=…`).
 
 > **About step 2 (`reseed-hard PROFILE=raw`):** `reseed-hard` wipes the lab back to a clean, known
 > baseline with a fresh canary, so every run starts identical (no leftover state skews the score).
